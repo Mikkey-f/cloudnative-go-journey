@@ -1,0 +1,26 @@
+# Git
+.git
+.gitignore
+
+# 文档
+*.md
+docs/
+
+# K8s配置
+k8s/
+
+# 脚本
+scripts/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 测试
+*_test.go

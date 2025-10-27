@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-server
+  labels:
+    app: api
+    version: v0.1
+spec:
+  # 副本数：2个Pod提供高可用
+  replicas: 2
+  
+  # 选择器：匹配哪些Pod
+  selector:
+    matchLabels:
+      app: api
+  
+  # Pod模板
+  template:
+    metadata:
+      labels:
+        app: api
+        version: v0.1
+    spec:
+      containers:
+      - name: api
+        image: cloudnative-go-api:v0.1
+        imagePullPolicy: IfNotPresent  # Minikube本地镜像
+        
+        ports:
+        - containerPort: 8080
+          name: http
+        
+        # 环境变量
+        env:
+        - name: PORT
+          value: "8080"
+        - name: ENVIRONMENT
+          value: "production"
+        - name: APP_NAME
+          value: "cloudnative-go-api"
+        - name: VERSION
+          value: "v0.1.0"
+        
+        # 资源限制
+        resources:
+          requests:
+            memory: "64Mi"   # 保证64Mi内存
+            cpu: "100m"      # 保证0.1核CPU
+          limits:
+            memory: "128Mi"  # 最多128Mi内存
+            cpu: "200m"      # 最多0.2核CPU
+        
+        # 存活探针（Liveness Probe）
+        # 失败后K8s会重启容器
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10  # 启动后等待10秒
+          periodSeconds: 10        # 每10秒检查一次
+          timeoutSeconds: 3        # 超时3秒算失败
+          failureThreshold: 3      # 连续失败3次才重启
+        
+        # 就绪探针（Readiness Probe）
+        # 失败后从Service移除，不接收流量
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5   # 启动后等待5秒
+          periodSeconds: 5         # 每5秒检查一次
+          timeoutSeconds: 2        # 超时2秒算失败
+          failureThreshold: 3      # 连续失败3次才摘除
