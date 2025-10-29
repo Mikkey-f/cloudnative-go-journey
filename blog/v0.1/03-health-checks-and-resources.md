@@ -743,7 +743,7 @@ K8s 思维：
 
 ---
 
-**本文完整代码**：https://github.com/yourname/cloudnative-go-journey
+**本文完整代码**：[我的仓库](https://github.com/Mikkey-f/cloudnative-go-journey)
 
 今天的分享到这里就结束啦！如果觉得文章对你有帮助，可以：
 - ⭐ 给项目点个 Star
@@ -754,7 +754,7 @@ K8s 思维：
 
 ---
 
-**作者**：一个被健康检查坑过的学习者  
+**作者**：Mikkeyf
 **日期**：2025-10-27  
 **系列**：CloudNative Go Journey v0.1
 

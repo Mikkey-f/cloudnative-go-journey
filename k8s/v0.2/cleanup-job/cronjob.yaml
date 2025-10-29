@@ -1,0 +1,94 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cleanup-job
+  labels:
+    app: cleanup-job
+    version: v0.2
+spec:
+  # Cron 调度表达式：每小时执行一次
+  # 格式：分 时 日 月 周
+  #       * * * * *
+  schedule: "0 * * * *"  # 每小时的第0分钟执行
+  
+  # 其他常用调度示例：
+  # "*/15 * * * *"  - 每15分钟
+  # "0 2 * * *"     - 每天凌晨2点
+  # "0 0 * * 0"     - 每周日凌晨
+  # "0 0 1 * *"     - 每月1号凌晨
+  
+  # 时区设置（可选，需要 K8s 1.25+）
+  # timeZone: "Asia/Shanghai"
+  
+  # 历史保留限制
+  successfulJobsHistoryLimit: 3  # 保留最近3个成功的 Job
+  failedJobsHistoryLimit: 1      # 保留最近1个失败的 Job
+  
+  # 并发策略
+  # Allow: 允许并发执行（默认）
+  # Forbid: 禁止并发，如果前一个还在运行，跳过新的
+  # Replace: 替换，取消正在运行的，启动新的
+  concurrencyPolicy: Forbid
+  
+  # 启动截止时间（秒）
+  # 如果错过调度时间超过这个值，就跳过这次执行
+  startingDeadlineSeconds: 100
+  
+  # Job 模板
+  jobTemplate:
+    metadata:
+      labels:
+        app: cleanup-job
+        version: v0.2
+    spec:
+      # 完成后多久删除 Pod（秒）
+      ttlSecondsAfterFinished: 3600  # 1小时后删除
+      
+      # 失败重试次数
+      backoffLimit: 3
+      
+      # 任务超时时间（秒）
+      activeDeadlineSeconds: 300  # 5分钟
+      
+      template:
+        metadata:
+          labels:
+            app: cleanup-job
+            version: v0.2
+        spec:
+          # 重启策略（Job 必须是 OnFailure 或 Never）
+          restartPolicy: OnFailure
+          
+          containers:
+          - name: cleanup
+            image: cleanup-job:v0.2
+            imagePullPolicy: IfNotPresent
+            
+            # 环境变量
+            env:
+            # 直接设置完整的Redis地址（包含端口）
+            - name: REDIS_HOST
+              value: "redis-service:6379"
+            
+            - name: JOB_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            
+            - name: JOB_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            
+            # 资源限制
+            resources:
+              requests:
+                memory: "64Mi"
+                cpu: "50m"
+              limits:
+                memory: "128Mi"
+                cpu: "100m"
+          
+          # 优雅关闭时间
+          terminationGracePeriodSeconds: 30
+

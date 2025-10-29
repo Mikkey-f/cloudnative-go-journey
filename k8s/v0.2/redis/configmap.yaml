@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  labels:
+    app: redis
+    version: v0.2
+data:
+  redis.conf: |
+    # Redis 配置文件
+    # 绑定所有网络接口
+    bind 0.0.0.0
+    
+    # 端口
+    port 6379
+    
+    # 内存限制
+    maxmemory 128mb
+    
+    # 内存淘汰策略：优先删除最近最少使用的键
+    maxmemory-policy allkeys-lru
+    
+    # 持久化配置（RDB）
+    # 格式：save <秒> <变更次数>
+    # 900秒内至少1个key变更
+    save 900 1
+    # 300秒内至少10个key变更
+    save 300 10
+    # 60秒内至少10000个key变更
+    save 60 10000
+    
+    # 数据目录
+    dir /data
+    
+    # AOF 持久化,每一次写操作都以日志形式追加到aof文件中
+    appendonly yes
+    appendfilename "appendonly.aof"
+    
+    # AOF 同步策略
+    # always: 每次写入都同步（最安全但最慢）
+    # everysec: 每秒同步一次（推荐）
+    # no: 由操作系统决定何时同步
+    appendfsync everysec
+    
+    # 日志级别
+    loglevel notice
+    
+    # 保护模式（关闭，因为在K8s内部网络）
+    protected-mode no
+

@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/yourname/cloudnative-go-journey/src/cache"
 	"github.com/yourname/cloudnative-go-journey/src/config"
 	"github.com/yourname/cloudnative-go-journey/src/handler"
 	"github.com/yourname/cloudnative-go-journey/src/metrics"
@@ -23,6 +24,33 @@ import (
 func main() {
 	// 加载配置
 	cfg := config.Load()
+
+	// 初始化 Redis 客户端
+	redisAddr := os.Getenv("REDIS_HOST")
+	if redisAddr == "" {
+		redisAddr = "localhost" // 本地开发默认值
+	}
+	redisPort := os.Getenv("REDIS_PORT")
+	if redisPort == "" {
+		redisPort = "6379"
+	}
+	redisFullAddr := fmt.Sprintf("%s:%s", redisAddr, redisPort)
+
+	log.Printf("🔗 Connecting to Redis at %s...", redisFullAddr)
+	redisCache, err := cache.NewRedisCache(redisFullAddr)
+	if err != nil {
+		log.Printf("⚠️  Warning: Redis connection failed: %v", err)
+		log.Printf("⚠️  Continuing without cache support...")
+		// 在生产环境可能需要 fatal，这里为了演示继续运行
+	} else {
+		log.Printf("✅ Redis connected successfully")
+		defer func(redisCache *cache.RedisCache) {
+			err := redisCache.Close()
+			if err != nil {
+				log.Fatalln("<UNK>  Warning: Redis connection close failed:", err)
+			}
+		}(redisCache)
+	}
 
 	// 设置 Gin 模式，release模式精简日志
 	if cfg.Environment == "production" {
@@ -45,8 +73,24 @@ func main() {
 	// 业务接口
 	api := router.Group("/api/v1")
 	{
+		// v0.1 接口
 		api.GET("/hello", handler.Hello)
 		api.GET("/info", handler.Info)
+	}
+
+	// v0.2 新增：缓存和数据接口
+	if redisCache != nil {
+		cacheHandler := handler.NewCacheHandler(redisCache)
+		dataHandler := handler.NewDataHandler(redisCache)
+
+		api.GET("/cache/test", cacheHandler.TestCache)
+		api.GET("/config", cacheHandler.GetConfig)
+		api.GET("/cache/stats", dataHandler.GetCacheStats)
+
+		api.POST("/data", dataHandler.CreateData)
+		api.GET("/data/:key", dataHandler.GetData)
+		api.DELETE("/data/:key", dataHandler.DeleteData)
+		api.GET("/data", dataHandler.ListKeys)
 	}
 
 	// Prometheus 指标接口

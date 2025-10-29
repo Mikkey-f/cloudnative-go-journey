@@ -13,7 +13,7 @@ func Hello(c *gin.Context) {
 	name := c.DefaultQuery("name", "CloudNative")
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":   "Hello, " + name + "!",
+		"message":   "hi, " + name + "!",
 		"timestamp": time.Now().Format(time.RFC3339),
 		"pod":       os.Getenv("HOSTNAME"), // K8s 中 Pod 名称
 	})

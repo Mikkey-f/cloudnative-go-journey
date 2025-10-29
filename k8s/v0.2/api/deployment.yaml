@@ -1,0 +1,143 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-server
+  labels:
+    app: api
+    version: v0.2
+spec:
+  # 副本数
+  replicas: 2
+  
+  # 选择器
+  selector:
+    matchLabels:
+      app: api
+  
+  # 更新策略
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # 最多可超出期望副本数的数量（2 副本时，最多同时运行 3 个 Pod）
+      maxUnavailable: 0  # 更新过程中，最多不可用的副本数（0 表示“始终有 2 个可用”）
+  
+  # Pod 模板
+  template:
+    metadata:
+      labels:
+        app: api
+        version: v0.2
+      annotations:
+        # Prometheus 抓取配置
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: api
+        image: cloudnative-go-api:v0.2
+        imagePullPolicy: IfNotPresent
+        
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        
+        # 环境变量（从 ConfigMap 注入）
+        env:
+        - name: APP_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: api-config
+              key: app_env
+        
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: api-config
+              key: log_level
+        
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: api-config
+              key: redis_host
+        
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: api-config
+              key: redis_port
+        
+        - name: CACHE_TTL
+          valueFrom:
+            configMapKeyRef:
+              name: api-config
+              key: cache_ttl
+        
+        # Pod 信息注入（可选）
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name  # 注入 Pod 名称（如 "api-server-7f8d6f9b45-2xqzk"）
+        
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace # 注入所在命名空间（如 "default"）
+        
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP # 注入 Pod IP（如 "10.244.1.5"）
+        
+        # 资源限制
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        
+        # 存活探针
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        
+        # 就绪探针
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        
+        # 启动探针（可选，用于慢启动应用）
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 12  # 最多等待 60 秒
+      
+      # 重启策略
+      restartPolicy: Always
+      
+      # 优雅关闭时间
+      terminationGracePeriodSeconds: 30
+

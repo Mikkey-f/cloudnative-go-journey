@@ -1,0 +1,118 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  labels:
+    app: redis
+    version: v0.2
+spec:
+  # 关联的 Headless Service
+  serviceName: redis-service
+  
+  # 副本数（单机版Redis）
+  replicas: 1
+  
+  # 选择器
+  selector:
+    matchLabels:
+      app: redis
+  
+  # Pod 模板
+  template:
+    metadata:
+      labels:
+        app: redis
+        version: v0.2
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        
+        # 启动命令：使用自定义配置文件
+        command:
+        - redis-server
+        - /etc/redis/redis.conf
+        
+        ports:
+        - containerPort: 6379
+          name: redis
+          protocol: TCP
+        
+        # 资源限制
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        
+        # 存活探针
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        # 就绪探针
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        # 挂载卷
+        volumeMounts:
+        # 数据持久化目录
+        - name: redis-data
+          mountPath: /data
+        # 配置文件
+        - name: redis-config
+          mountPath: /etc/redis
+      
+      # 非持久化卷（ConfigMap）
+      volumes:
+      - name: redis-config
+        configMap:
+          name: redis-config
+  
+  # 持久化卷声明模板（重要！）
+  # StatefulSet 会为每个 Pod 自动创建 PVC
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+      labels:
+        app: redis
+    spec:
+      # 访问模式：单节点读写
+      accessModes: 
+      - ReadWriteOnce
+      
+      # 存储资源请求
+      resources:
+        requests:
+          storage: 1Gi
+      
+      # 存储类（可选，使用默认存储类）
+      # storageClassName: standard
+  
+  # 更新策略
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # 分区更新（可选）
+      partition: 0
+  
+  # Pod 管理策略
+  # OrderedReady: 有序启动和停止（默认）
+  # Parallel: 并行启动和停止
+  podManagementPolicy: OrderedReady
+
