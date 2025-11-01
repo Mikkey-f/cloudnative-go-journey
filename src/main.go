@@ -93,6 +93,14 @@ func main() {
 		api.GET("/data", dataHandler.ListKeys)
 	}
 
+	// v0.3 新增：工作负载测试接口（用于 HPA 测试）
+	workload := api.Group("/workload")
+	{
+		workload.GET("", handler.WorkloadHandler)               // 综合负载
+		workload.GET("/cpu", handler.CPUIntensiveHandler)       // CPU 密集型
+		workload.GET("/memory", handler.MemoryIntensiveHandler) // 内存密集型
+	}
+
 	// Prometheus 指标接口
 	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 

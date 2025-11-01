@@ -1,0 +1,128 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudnative-api
+  labels:
+    app: cloudnative-api
+    version: v0.3
+spec:
+  # 副本数（HPA 会管理这个值）
+  replicas: 2
+  
+  # 选择器
+  selector:
+    matchLabels:
+      app: cloudnative-api
+  
+  # 更新策略
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # 最多可超出期望副本数的数量
+      maxUnavailable: 0  # 更新过程中，最多不可用的副本数
+  
+  # Pod 模板
+  template:
+    metadata:
+      labels:
+        app: cloudnative-api
+        version: v0.3
+      annotations:
+        # Prometheus 抓取配置
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: api
+        image: cloudnative-api:v0.3
+        imagePullPolicy: IfNotPresent
+        
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        
+        # 环境变量
+        env:
+        - name: APP_ENV
+          value: "production"
+        
+        - name: LOG_LEVEL
+          value: "info"
+        
+        - name: REDIS_HOST
+          value: "redis-service"
+        
+        - name: REDIS_PORT
+          value: "6379"
+        
+        - name: CACHE_TTL
+          value: "300"
+        
+        # Pod 信息注入
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        
+        # ⭐ v0.3 优化的资源配置（为 HPA 准备）
+        resources:
+          requests:
+            memory: "128Mi"  # 提高基准（v0.2: 64Mi → v0.3: 128Mi）
+            cpu: "100m"      # HPA 计算基准
+          limits:
+            memory: "256Mi"  # 2x 突发比
+            cpu: "300m"      # 3x 突发比（v0.2: 500m → v0.3: 300m，更合理）
+        
+        # 存活探针
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        
+        # 就绪探针
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        
+        # 启动探针（加快启动检测）
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 0
+          periodSeconds: 2
+          timeoutSeconds: 2
+          successThreshold: 1
+          failureThreshold: 15  # 最多等待 30 秒
+      
+      # 重启策略
+      restartPolicy: Always
+      
+      # 优雅关闭时间
+      terminationGracePeriodSeconds: 30
+

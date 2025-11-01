@@ -1,0 +1,78 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cloudnative-api-hpa
+  labels:
+    app: cloudnative-api
+    version: v0.3
+spec:
+  # 目标工作负载
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cloudnative-api
+  
+  # 副本数范围
+  minReplicas: 2   # 最小副本数（确保高可用）
+  maxReplicas: 10  # 最大副本数（防止过度扩展）
+  
+  # 扩缩容指标
+  metrics:
+  # 1. CPU 利用率目标（相对于 requests）
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70  # 当平均 CPU 利用率超过 70% 时扩容
+  
+  # 2. 内存利用率目标（相对于 requests）
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80  # 当平均内存利用率超过 80% 时扩容
+  
+  # ⭐ v0.3 新增：扩缩容行为控制
+  behavior:
+    # 缩容行为
+    scaleDown:
+      # 稳定窗口：5 分钟内指标稳定才开始缩容（防抖动）
+      stabilizationWindowSeconds: 300
+      
+      # 缩容策略（可定义多个策略，选择最保守的）
+      policies:
+      # 策略1：每分钟最多减少 1 个 Pod
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+      
+      # 策略2：每分钟最多减少 10% 的 Pod
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+      
+      # 选择策略：Min = 最保守（减少最少）
+      selectPolicy: Min
+    
+    # 扩容行为
+    scaleUp:
+      # 稳定窗口：0 秒（立即响应流量激增）
+      stabilizationWindowSeconds: 0
+      
+      # 扩容策略
+      policies:
+      # 策略1：每 15 秒最多增加 100% 的 Pod（翻倍）
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      
+      # 策略2：每分钟最多增加 2 个 Pod
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      
+      # 选择策略：Max = 最激进（增加最多）
+      selectPolicy: Max
+
