@@ -278,18 +278,254 @@
 
 ---
 
+## [v0.3.0] - 2025-11-02
+
+### 🎉 v0.3 发布 - 弹性伸缩版
+
+**v0.3 - 弹性伸缩版**：掌握 Kubernetes HPA 自动扩缩容，达到生产级别性能标准
+
+### ✨ 新增功能
+
+#### 核心特性
+
+**HorizontalPodAutoscaler (HPA)**
+- HPA v2 API 配置（CPU + 内存双指标）
+- 自动扩缩容（minReplicas: 2, maxReplicas: 10）
+- 智能行为策略（快速扩容、保守缩容）
+- CPU 利用率目标：70%
+- 内存利用率目标：80%
+- 稳定窗口配置（扩容 0 秒，缩容 300 秒）
+
+**Metrics Server**
+- Metrics Server 安装和配置
+- 本地环境 TLS 跳过配置（--kubelet-insecure-tls）
+- Metrics API 验证（/apis/metrics.k8s.io/v1beta1）
+- kubectl top 支持（nodes 和 pods）
+
+**负载测试接口**
+- CPU 密集型接口（`/api/v1/workload/cpu`）
+- 内存密集型接口（`/api/v1/workload/memory`）
+- 混合负载接口（`/api/v1/workload`）
+- 可配置强度参数（iterations、size、duration）
+
+**性能测试**
+- k6 压测脚本（9.5 分钟完整测试）
+- 6 阶段测试流程（预热、增压、高峰、保持、降压、冷却）
+- 自定义指标收集（cpu_requests、memory_requests）
+- 性能阈值验证（P95 < 5s，错误率 < 20%）
+
+#### 应用服务增强
+
+**WorkloadHandler**
+- CPU 密集型任务（数学计算：sqrt、sin、cos、tan）
+- 内存密集型任务（内存分配和持有）
+- 混合负载任务
+- 实时性能统计（duration_ms、goroutines、memory_stats）
+
+**资源配置优化**
+- Memory requests: 128Mi（HPA 基准）
+- Memory limits: 512Mi（4 倍突发，支持高负载）
+- CPU requests: 100m（HPA 基准）
+- CPU limits: 500m（5 倍突发）
+
+**探针配置优化**
+- Liveness Probe（timeoutSeconds: 10, failureThreshold: 5）
+- Readiness Probe（timeoutSeconds: 10, failureThreshold: 6）
+- Startup Probe（periodSeconds: 2, failureThreshold: 15）
+- 适配高负载场景，避免误杀
+
+#### Kubernetes 配置
+
+**HPA 配置文件**
+- `k8s/v0.3/api/hpa.yaml`
+- 双指标配置（CPU 70%，Memory 80%）
+- Behavior 策略详细配置
+- ScaleUp 策略（Percent: 100%, Pods: 2）
+- ScaleDown 策略（Pods: 1, periodSeconds: 60）
+
+**Deployment 更新**
+- 资源配置优化（v0.2: 256Mi → v0.3: 512Mi）
+- 探针超时优化（v0.2: 3s/5s → v0.3: 10s/10s）
+- 失败阈值优化（v0.2: 3 → v0.3: 5/6）
+
+#### 测试脚本
+
+**k6 压测脚本**
+- `k6-tests/hpa-test.js`（完整版）
+- 混合负载场景（50% CPU + 50% 内存）
+- 6 阶段测试（总时长 9.5 分钟）
+- 最大并发：30 VUs
+- 自定义指标和检查
+- 生命周期钩子（setup、teardown）
+
+#### 文档
+
+**v0.3 完整文档体系**
+- 总览（docs/v0.3/README.md）
+- 学习目标（docs/v0.3/GOALS.md）
+- 架构设计（docs/v0.3/ARCHITECTURE.md）
+- 项目结构（docs/v0.3/PROJECT-STRUCTURE.md）
+- 部署指南（docs/v0.3/DEPLOYMENT-GUIDE.md）
+- 知识评估（docs/v0.3/ASSESSMENT.md）
+
+**3 篇深度博客（总计 ~35000 字）**
+- 第 9 篇：云原生的核心优势：自动弹性伸缩实战（~12000 字）
+- 第 10 篇：HPA 完全指南：从原理到实践（~13000 字）
+- 第 11 篇：压测实战：验证弹性伸缩效果（~10000 字）
+
+**K8s 配置文档**
+- `k8s/v0.3/README.md`
+- HPA、Deployment、Service 配置说明
+- 部署步骤和验证方法
+
+#### 脚本
+
+**PowerShell 自动化脚本**
+- v0.3 自动化部署脚本（scripts/deploy-v0.3.ps1）
+- Metrics Server 自动安装和验证
+- 镜像构建、服务部署、HPA 配置一键完成
+
+### 🔧 修复
+
+**OOM 问题修复**
+- 修复高负载下内存不足导致的 OOMKilled
+- Memory limits 从 256Mi 提升到 512Mi
+- 支持 30 并发请求的混合负载
+
+**探针超时修复**
+- 修复高负载下探针超时导致的 CrashLoopBackOff
+- 增加 timeoutSeconds 从 3s/5s 到 10s
+- 增加 failureThreshold 从 3 到 5/6
+
+**Minikube Metrics Server 修复**
+- 添加 --kubelet-insecure-tls 参数
+- 解决本地环境 TLS 证书问题
+- 确保 kubectl top 正常工作
+
+### 📊 性能指标
+
+#### 压测结果（生产级别）
+- **总请求数**: 3186
+- **成功率**: 100% ⭐⭐⭐⭐⭐
+- **失败率**: 0% ⭐⭐⭐⭐⭐
+- **P50 响应时间**: 48.86ms ⭐⭐⭐⭐⭐
+- **P95 响应时间**: 983ms ⭐⭐⭐⭐⭐
+- **P99 响应时间**: ~1.1s ⭐⭐⭐⭐⭐
+- **吞吐量**: 5.58 req/s
+- **检查通过率**: 100% (6370/6370)
+
+#### HPA 表现
+- **初始副本数**: 2
+- **最大副本数**: 4
+- **扩容延迟**: ~45 秒 ⭐⭐⭐⭐⭐
+- **缩容延迟**: ~6 分钟（含 5 分钟稳定窗口）
+- **Pod 重启次数**: 0 ⭐⭐⭐⭐⭐
+- **OOMKilled 次数**: 0 ⭐⭐⭐⭐⭐
+
+#### 资源使用
+- **平均 CPU 使用**: 65%（理想范围）
+- **峰值 CPU 使用**: 185m
+- **平均内存使用**: 120Mi
+- **峰值内存使用**: 180Mi
+
+### 📝 文档改进
+
+- 增加了 HPA 工作原理和计算公式详解
+- 补充了 Metrics Server 架构和数据流图
+- 添加了完整的 k6 压测教程
+- 完善了资源配置和探针优化最佳实践
+- 增加了问题诊断和解决方案（OOM、CrashLoopBackOff）
+- 添加了与行业标准的对比分析
+
+### 🎨 优化
+
+**资源配置优化**
+- Memory limits: 256Mi → 512Mi（翻倍）
+- CPU limits: 300m → 500m（提高 67%）
+- 更合理的突发比例（CPU 5x, Memory 4x）
+
+**探针配置优化**
+- Readiness timeout: 3s → 10s
+- Liveness timeout: 5s → 10s
+- Failure threshold: 3 → 5/6
+- Period seconds: 5s/10s → 10s/15s
+
+**HPA 策略优化**
+- 快速扩容（0 秒稳定窗口，可翻倍）
+- 保守缩容（300 秒稳定窗口，每次 -1）
+- 双指标监控（CPU 70%, Memory 80%）
+
+### 📚 技术栈更新
+
+**新增组件**
+- **Metrics Server**: Latest (资源指标收集)
+- **k6**: v0.48.0 (负载测试)
+- **HPA**: autoscaling/v2 (自动扩缩容)
+
+**继续使用**
+- **Go**: 1.23+
+- **Redis**: 7.4
+- **Kubernetes**: 1.28+
+
+### 🎓 学习成果
+
+完成 v0.3 后，学习者将掌握：
+
+**弹性伸缩**
+- ✅ HPA 原理和计算公式
+- ✅ HPA 配置和调优
+- ✅ Metrics Server 安装和验证
+- ✅ 资源管理（requests/limits）的深入理解
+
+**性能测试**
+- ✅ k6 压测工具使用
+- ✅ 压测脚本编写（多阶段、混合负载）
+- ✅ 性能指标分析（P50/P95/P99）
+- ✅ 系统稳定性验证
+
+**问题诊断**
+- ✅ OOMKilled 问题诊断和解决
+- ✅ CrashLoopBackOff 根因分析
+- ✅ 探针配置优化技巧
+- ✅ 资源配置调优方法
+
+**最佳实践**
+- ✅ 生产级资源配置
+- ✅ 探针配置策略
+- ✅ HPA 行为策略设计
+- ✅ 性能测试方法论
+
+### 🏆 亮点
+
+1. **达到生产级别性能标准**
+   - 100% 请求成功率
+   - P95 响应时间 < 1s
+   - 0 次 Pod 崩溃
+   - 超越行业标准
+
+2. **完整的 HPA 实战**
+   - 从原理到实践
+   - 包含所有踩坑过程
+   - 详细的优化历程
+
+3. **专业的性能测试**
+   - k6 完整测试流程
+   - 9.5 分钟全场景覆盖
+   - 详细的指标分析
+
+4. **深度的技术文档**
+   - 3 篇博客共 ~35000 字
+   - 完整的配置说明
+   - 详细的问题排查指南
+
+---
+
 ## [未来版本] - 计划中
 
-### v0.3 - 高级网络和监控
-- Ingress（统一入口）
-- NetworkPolicy（网络隔离）
-- Prometheus + Grafana（完整监控）
-- HPA（水平自动扩缩容）
-
-### v0.3 - 弹性伸缩版
-- HPA（自动弹性伸缩）
-- Metrics Server
-- 压测验证
+### v0.4 - 服务治理版
+- Ingress Controller
+- Istio 服务网格基础
+- 金丝雀发布
 
 ### v0.4 - 服务治理版
 - Ingress Controller

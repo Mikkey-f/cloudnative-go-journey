@@ -13,7 +13,7 @@ import (
 // WorkloadHandler 综合负载接口
 // 支持 CPU、内存、混合负载测试
 func WorkloadHandler(c *gin.Context) {
-	workloadType := c.DefaultQuery("type", "cpu")
+	workloadType := c.DefaultQuery("type", "mixed")
 	intensity := getIntParam(c, "intensity", 50)
 
 	startTime := time.Now()

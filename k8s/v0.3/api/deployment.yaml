@@ -79,35 +79,35 @@ spec:
         # ⭐ v0.3 优化的资源配置（为 HPA 准备）
         resources:
           requests:
-            memory: "128Mi"  # 提高基准（v0.2: 64Mi → v0.3: 128Mi）
+            memory: "128Mi"  # HPA 计算基准
             cpu: "100m"      # HPA 计算基准
           limits:
-            memory: "256Mi"  # 2x 突发比
-            cpu: "300m"      # 3x 突发比（v0.2: 500m → v0.3: 300m，更合理）
+            memory: "512Mi"  # 4x 突发比（增加以支持负载测试）
+            cpu: "500m"      # 5x 突发比（增加以支持 CPU 密集型任务）
         
-        # 存活探针
+        # 存活探针（优化：增加超时和失败阈值，避免误杀）
         livenessProbe:
           httpGet:
             path: /health
             port: 8080
             scheme: HTTP
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          timeoutSeconds: 5
+          initialDelaySeconds: 15     # 增加初始延迟（原来 10 秒）
+          periodSeconds: 15           # 每 15 秒检查一次（原来 10 秒）
+          timeoutSeconds: 10          # 超时时间 10 秒（原来 5 秒）
           successThreshold: 1
-          failureThreshold: 3
+          failureThreshold: 5         # 允许失败 5 次（原来 3 次），即 75 秒
         
-        # 就绪探针
+        # 就绪探针（优化：增加超时和失败阈值，适应负载测试）
         readinessProbe:
           httpGet:
             path: /ready
             port: 8080
             scheme: HTTP
           initialDelaySeconds: 5
-          periodSeconds: 5
-          timeoutSeconds: 3
+          periodSeconds: 10          # 每 10 秒检查一次（原来 5 秒）
+          timeoutSeconds: 10          # 超时时间 10 秒（原来 3 秒）
           successThreshold: 1
-          failureThreshold: 3
+          failureThreshold: 6         # 允许失败 6 次（原来 3 次），即 60 秒
         
         # 启动探针（加快启动检测）
         startupProbe:
