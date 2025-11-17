@@ -209,6 +209,100 @@ Envoy 热重载配置
 新流量规则生效 ✅
 ```
 
+### 2.4 完整流量流向解析
+
+在理解了控制平面和数据平面的职责后，我们通过一张完整的架构图来看 Istio 如何处理三种流量场景：
+
+![Istio 完整流量架构图](https://raw.githubusercontent.com/Mikkey-f/cloudnative-go-journey/main/blog/v0.4/images/istio-traffic-flow.png)
+
+> 上图展示了 Istio 在生产环境中的完整流量管理架构，包含入站、服务间调用、出站三大场景。
+
+#### 流量场景详解
+
+**1. 入站流量（南向）：外部 → 内部**
+
+```text
+步骤1-4：外部请求进入集群
+客户端 (1)
+  ↓
+云LB (2)
+  ↓
+istio-ingressgateway service (3)
+  ↓
+istio-ingressgateway envoy (4)  ← IngressGateway Pod
+  ↓
+根据 Gateway + VirtualService 规则路由
+  ↓
+选择目标 Pod (Pod1/Pod2/Pod3)
+```
+
+**关键点**：
+- `istio-ingressgateway` 本质是一个带 Envoy 代理的 Pod
+- 通过 `Gateway` 资源定义监听端口和域名
+- 通过 `VirtualService` 定义路由规则（如 90/10 权重分配）
+
+**2. 服务间调用（东西向）：Pod ↔ Pod**
+
+```text
+步骤4-9：服务间调用流程
+Pod1 的 api 应用发起请求
+  ↓
+被本地 Sidecar Envoy 劫持 (5)
+  ↓
+Envoy 查询 api-service 的端点 (6)
+  ↓
+根据负载均衡策略选择目标 Pod (7)
+  ↓
+请求到达 Pod2 的 Sidecar Envoy (9)
+  ↓
+Envoy 执行 mTLS、鉴权、限流等策略
+  ↓
+转发给 Pod2 的 api 应用
+```
+
+**关键点**：
+- 所有流量都经过 Sidecar Envoy，应用无感知
+- 通过 `DestinationRule` 定义负载均衡、熔断、连接池策略
+- 自动实现 mTLS 加密通信
+
+**3. 出站流量（北向）：内部 → 外部**
+
+```text
+步骤8-12：访问外部服务
+Pod3 的 DB 应用需要访问公网
+  ↓
+被本地 Sidecar Envoy 劫持 (8)
+  ↓
+Envoy 识别为外部流量 (10)
+  ↓
+转发到 istio-egressgateway service (11)
+  ↓
+istio-egressgateway envoy 统一出口 (12)
+  ↓
+访问公网
+```
+
+**关键点**：
+- EgressGateway 提供**统一的外部访问出口**
+- 便于审计、监控、限流所有外部调用
+- 可通过 `ServiceEntry` 定义允许访问的外部服务
+
+#### 为什么需要 Gateway？
+
+| 组件 | 作用 | 使用场景 |
+|------|------|----------|
+| **IngressGateway** | 统一入口 | 外部流量进入集群的唯一入口，替代传统的 Ingress Controller |
+| **EgressGateway** | 统一出口 | 集群内部访问外部服务的统一出口，便于审计和控制 |
+
+#### 流量治理的核心优势
+
+从这张架构图可以看出，Istio 的 Sidecar 模式带来了：
+
+1. **全链路可观测**：每次调用都经过 Envoy，自动生成指标和追踪信息
+2. **策略统一管理**：通过 VirtualService/DestinationRule 集中配置，无需修改应用代码
+3. **零信任安全**：默认启用 mTLS，所有服务间通信自动加密
+4. **灵活的流量控制**：支持权重路由、Header 匹配、故障注入等高级特性
+
 ---
 
 ## 三、Istio 核心组件详解

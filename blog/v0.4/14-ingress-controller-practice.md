@@ -16,17 +16,17 @@
 
 ## 前言
 
-在《Ingress 深度剖析：从 Service 到统一入口》中，我们已经把 Ingress 的概念、架构、PathType 等规范梳理清楚。带着这些“底层逻辑”来到实战环节，很多读者都会遇到和我一样的真实场景：
+在《Ingress 深度剖析：从 Service 到统一入口》中，我们已经把 Ingress 的概念、架构、PathType 等规范梳理清楚。带着这些"底层逻辑"来到实战环节，很多读者都会遇到和我一样的真实场景：
 
 > 集群里既想用 Nginx Ingress 暴露服务，又想拥抱 Istio 的金丝雀发布，结果入口混乱、流量失控。
 
-所以这篇文章不止是“如何安装一个 Ingress Controller”，而是围绕一个真实练手项目展开：
+所以这篇文章不止是"如何安装一个 Ingress Controller"，而是围绕一个真实练手项目展开：
 
 - ✅ 用 **场景化流程** 拆解 Nginx Ingress Controller 的工作机理
 - ✅ 一步步部署、验证，并处理常见踩坑（hosts、端口、证书）
 - ✅ 通过高级路由案例（路径、域名、TLS）提升实战深度
 - ⚠️ **重点拆解** 与 Istio 共存时的架构冲突与决策
-- ✅ 给出迁移 Istio 的“Checklist”，让演进有据可依
+- ✅ 给出迁移 Istio 的"Checklist"，让演进有据可依
 
 读完你应该能做到：先基于 Nginx Ingress 驾驭北向流量，然后在需要更强治理能力时从容迁移到服务网格。
 
@@ -61,7 +61,7 @@ Ingress Controller Pod (Nginx)
 2. **控制器监听**：Nginx Ingress Controller 持续 watch Kubernetes API，一旦 Ingress 资源变更就热更新自身配置。
 3. **路由决策**：最终由 Nginx 进程执行 L7 规则，将请求转发到对应 Service，再由 kube-proxy 完成 Pod 级别的负载均衡。
 
-只要记住“Ingress 负责描述、Controller 负责执行”，就不会再把 YAML 当成流量入口本身。
+只要记住"Ingress 负责描述、Controller 负责执行"，就不会再把 YAML 当成流量入口本身。
 
 **核心组件**：
 1. **Ingress 资源**: YAML 定义的路由规则
@@ -162,7 +162,7 @@ spec:
               number: 8080
 ```
 
-这段 Ingress 做了三件事：明确使用 `nginx` 控制器、绑定 `app.local` 域名，以及为 `/api` 与 `/` 指定不同的 Service。配合 hosts 文件即可实现“同一域名对应多后端服务”的典型场景。
+这段 Ingress 做了三件事：明确使用 `nginx` 控制器、绑定 `app.local` 域名，以及为 `/api` 与 `/` 指定不同的 Service。配合 hosts 文件即可实现"同一域名对应多后端服务"的典型场景。
 
 ### 2.3 验证 Ingress
 
@@ -350,7 +350,7 @@ TLS 配置的关键点在于证书管理：
      backend:
        service:
          name: api-service
-   
+
    # VirtualService 说：/api/v1 按 90/10 分流
    - match:
      - uri:
@@ -360,13 +360,14 @@ TLS 配置的关键点在于证书管理：
          host: api-service
          subset: v1
        weight: 90
-   
+
    ❌ 谁优先？规则如何合并？
    ```
 
 ### 4.2 真实场景：我踩的坑
 
 **问题现象**：
+
 ```bash
 # 部署了 Ingress
 kubectl apply -f k8s/v0.4/ingress/ingress.yaml
@@ -460,6 +461,7 @@ curl -H "Host: app.local" http://127.0.0.1/api/v1/version
 ### 5.2 迁移步骤
 
 **步骤 1：安装 Istio**
+
 ```bash
 # 下载 Istio
 curl -L https://istio.io/downloadIstio | sh -
@@ -473,6 +475,7 @@ kubectl get pods -n istio-system
 ```
 
 **步骤 2：删除 Ingress（避免冲突）**
+
 ```bash
 # ⚠️ 重要：先删除 Ingress
 kubectl delete -f k8s/v0.4/ingress/ingress.yaml
@@ -483,6 +486,7 @@ kubectl get ingress
 ```
 
 **步骤 3：为 Pod 注入 Sidecar**
+
 ```yaml
 # deployment-v1.yaml
 apiVersion: apps/v1
@@ -499,6 +503,7 @@ spec:
 ```
 
 **步骤 4：创建 Istio Gateway**
+
 ```yaml
 # k8s/v0.4/istio/gateway.yaml
 apiVersion: networking.istio.io/v1beta1
@@ -518,6 +523,7 @@ spec:
 ```
 
 **步骤 5：创建 VirtualService**
+
 ```yaml
 # k8s/v0.4/istio/virtual-service.yaml
 apiVersion: networking.istio.io/v1beta1
@@ -547,6 +553,7 @@ spec:
 ```
 
 **步骤 6：创建 DestinationRule**
+
 ```yaml
 # k8s/v0.4/istio/destination-rule.yaml
 apiVersion: networking.istio.io/v1beta1
@@ -565,6 +572,7 @@ spec:
 ```
 
 **步骤 7：部署和验证**
+
 ```bash
 # 部署 Istio 配置
 kubectl apply -f k8s/v0.4/istio/gateway.yaml
@@ -588,6 +596,7 @@ curl -H "Host: app.local" http://127.0.0.1/api/v1/version
 ### 5.3 迁移后的验证
 
 **验证流量分配**：
+
 ```powershell
 # 发起 100 次请求统计版本分布
 $results = 1..100 | ForEach-Object {
