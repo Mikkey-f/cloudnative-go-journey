@@ -1,10 +1,9 @@
 package middleware
 
 import (
+	"github.com/yourname/cloudnative-go-journey/src/backend/metrics"
 	"strconv"
 	"time"
-
-	"github.com/yourname/cloudnative-go-journey/src/metrics"
 
 	"github.com/gin-gonic/gin"
 )

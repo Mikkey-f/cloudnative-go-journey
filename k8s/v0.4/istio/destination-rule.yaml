@@ -1,0 +1,75 @@
+# v0.4 DestinationRule 配置
+# 功能: 定义 API 服务的子集、连接池和熔断策略
+# 部署: kubectl apply -f k8s/v0.4/istio/destination-rule.yaml
+
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: api-dr
+  namespace: default
+spec:
+  # 关联的 Kubernetes Service
+  host: api-service.default.svc.cluster.local
+
+  # 流量策略
+  trafficPolicy:
+    # 连接池配置
+    connectionPool:
+      http:
+        # HTTP/1.1 最大待处理请求数
+        http1MaxPendingRequests: 50
+        # HTTP/2 最大请求数
+        http2MaxRequests: 100
+        # 最大连接数
+        maxRequestsPerConnection: 2
+
+    # 异常检测和熔断
+    outlierDetection:
+      # 连续 5xx 错误后隔离
+      consecutive5xxErrors: 5
+      # 检查间隔
+      interval: 30s
+      # 隔离持续时间
+      baseEjectionTime: 30s
+      # 最大隔离比例
+      maxEjectionPercent: 50
+
+  # 子集定义 (对应 VirtualService 中的 subset)
+  subsets:
+  # v1 子集: 标签 version=v1 的 Pod
+  - name: v1
+    labels:
+      version: v1
+
+  # v2 子集: 标签 version=v2 的 Pod
+  - name: v2
+    labels:
+      version: v2
+
+---
+# 说明:
+# 1. host: 指定这个 DestinationRule 作用于 api-service
+# 2. connectionPool: 连接池配置，限制并发连接数
+# 3. outlierDetection: 异常检测，自动隔离故障 Pod
+# 4. subsets: 定义子集，用于流量分配
+
+# 连接池参数说明:
+# - http1MaxPendingRequests: 等待连接的最大请求数
+# - http2MaxRequests: 最大并发请求数
+# - maxRequestsPerConnection: 每个连接最多请求数
+
+# 异常检测参数说明:
+# - consecutive5xxErrors: 连续错误数，超过则隔离
+# - interval: 检查间隔
+# - baseEjectionTime: 隔离持续时间
+# - maxEjectionPercent: 最多隔离多少比例的 Pod
+
+# 子集标签要求:
+# - v1 Pod 需要标签: version=v1
+# - v2 Pod 需要标签: version=v2
+# 在 Deployment 中配置:
+# spec:
+#   template:
+#     metadata:
+#       labels:
+#         version: v1  # 或 v2

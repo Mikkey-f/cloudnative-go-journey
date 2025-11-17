@@ -1,0 +1,31 @@
+# v0.4 前端服务 Service
+# 功能: 为前端 Pod 提供内部服务发现
+# 部署: kubectl apply -f k8s/v0.4/frontend/service.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: default
+  labels:
+    app: frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: frontend
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+
+---
+# 说明:
+# 1. type: ClusterIP - 仅在集群内部可访问
+# 2. selector: 选择标签为 app: frontend 的 Pod
+# 3. port: 8080 - Service 端口
+# 4. targetPort: 8080 - Pod 端口
+
+# 访问方式:
+# - 集群内部: http://frontend-service:8080
+# - 集群内部: http://frontend-service.default.svc.cluster.local:8080

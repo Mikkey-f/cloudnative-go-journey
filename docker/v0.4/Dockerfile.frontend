@@ -1,0 +1,39 @@
+# v0.4 前端 Dockerfile
+# 功能: 使用 Nginx 部署前端应用
+# 构建: docker build -f docker/v0.4/Dockerfile.frontend -t frontend:latest .
+
+# ========================================
+# Stage 1: 构建阶段（可选，如果有前端构建流程）
+# ========================================
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# 如果有 package.json，复制依赖
+# COPY src/frontend/package*.json ./
+# RUN npm install
+# RUN npm run build
+
+# ========================================
+# Stage 2: 运行阶段
+# ========================================
+FROM nginx:alpine
+
+# 安装 curl（用于健康检查）
+RUN apk add --no-cache curl
+
+# 复制前端文件到 Nginx
+COPY src/frontend/ /usr/share/nginx/html/
+
+# 复制 Nginx 配置
+COPY docker/v0.4/nginx.conf /etc/nginx/nginx.conf
+
+# 暴露端口
+EXPOSE 8080
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl --fail http://localhost:8080/ || exit 1
+
+# 启动 Nginx
+CMD ["nginx", "-g", "daemon off;"]

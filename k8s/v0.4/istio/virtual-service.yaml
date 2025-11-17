@@ -1,0 +1,74 @@
+# v0.4 VirtualService 配置
+# 功能: 定义 API 服务的流量路由规则，实现 90/10 金丝雀发布
+# 部署: kubectl apply -f k8s/v0.4/istio/virtual-service.yaml
+
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: api-vs
+  namespace: default
+spec:
+  # 关联的 Kubernetes Service + 外部域名
+  hosts:
+  - api-service.default.svc.cluster.local
+  - app.local
+
+  # 绑定到 Istio Gateway（外部流量入口）和 mesh（集群内部调用）
+  gateways:
+  - app-gateway
+  - mesh
+
+  # HTTP 路由规则
+  http:
+  - match:
+    - uri:
+        prefix: /api/v1
+    route:
+    # 90% 流量到 v1 (稳定版本)
+    - destination:
+        host: api-service.default.svc.cluster.local
+        subset: v1
+      weight: 90
+
+    # 10% 流量到 v2 (新版本，金丝雀)
+    - destination:
+        host: api-service.default.svc.cluster.local
+        subset: v2
+      weight: 10
+
+    # 超时配置: 5 秒后超时
+    timeout: 5s
+
+    # 重试配置: 最多重试 3 次，每次 2 秒超时
+    retries:
+      attempts: 3
+      perTryTimeout: 2s
+
+  # 前端路径: 其余请求默认路由到前端服务
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: frontend-service.default.svc.cluster.local
+        port:
+          number: 8080
+      weight: 100
+
+---
+# 说明:
+# 1. hosts: 指定这个 VirtualService 作用于 api-service
+# 2. weight: 流量权重，90 + 10 = 100，表示流量分配比例
+# 3. subset: 子集名称，对应 DestinationRule 中定义的子集
+# 4. timeout: 请求超时时间
+# 5. retries: 失败重试配置
+
+# 金丝雀发布流程:
+# 1. 初始: 100% 流量到 v1
+# 2. 第一阶段: 90% v1, 10% v2 (本配置)
+# 3. 第二阶段: 50% v1, 50% v2
+# 4. 第三阶段: 0% v1, 100% v2
+# 5. 完成: 删除 v1，100% 流量到 v2
+
+# 验证流量分配:
+# bash scripts/v0.4/traffic-verify.sh

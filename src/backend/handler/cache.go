@@ -1,11 +1,11 @@
 package handler
 
 import (
+	"github.com/yourname/cloudnative-go-journey/src/backend/cache"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/yourname/cloudnative-go-journey/src/cache"
 )
 
 // CacheHandler 缓存处理器

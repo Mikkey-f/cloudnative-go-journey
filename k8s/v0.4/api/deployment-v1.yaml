@@ -1,0 +1,85 @@
+# v0.4 API v1 Deployment
+# 功能: 部署 API v1 (稳定版本) - 9 个副本
+# 部署: kubectl apply -f k8s/v0.4/api/deployment-v1.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-v1
+  namespace: default
+  labels:
+    app: api
+    version: v1
+  annotations:
+    sidecar.istio.io/inject: "true"
+spec:
+  replicas: 5  # v1 稳定版本，9 个副本（与 v2 对称），对应 90% 流量
+  selector:
+    matchLabels:
+      app: api
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: api
+        version: v1
+    spec:
+      containers:
+      - name: api
+        image: api:latest  # 使用 v1 镜像
+        imagePullPolicy: Never  # 本地开发使用 Never
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: PORT
+          value: "8080"
+        - name: ENVIRONMENT
+          value: "production"
+        - name: API_VERSION
+          value: "v1"
+        - name: REDIS_HOST
+          value: "redis-service"
+        - name: REDIS_PORT
+          value: "6379"
+        
+        # 健康检查
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+
+        # 资源限制
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+---
+# 说明:
+# 1. replicas: 9 - 9 个副本，对应 90% 流量分配
+# 2. version: v1 - 标签用于 DestinationRule 子集匹配
+# 3. image: api:latest - 使用 v1 镜像
+# 4. REDIS_HOST: redis-service - 连接到 Redis 服务
+# 5. livenessProbe: 存活探针
+# 6. readinessProbe: 就绪探针
+
+# 部署前需要:
+# 1. 构建 Docker 镜像: docker build -t api:latest .
+# 2. 部署 Redis: kubectl apply -f k8s/v0.3/redis/deployment.yaml

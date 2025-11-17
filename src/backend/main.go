@@ -11,11 +11,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/yourname/cloudnative-go-journey/src/cache"
-	"github.com/yourname/cloudnative-go-journey/src/config"
-	"github.com/yourname/cloudnative-go-journey/src/handler"
-	"github.com/yourname/cloudnative-go-journey/src/metrics"
-	"github.com/yourname/cloudnative-go-journey/src/middleware"
+	"github.com/yourname/cloudnative-go-journey/src/backend/cache"
+	"github.com/yourname/cloudnative-go-journey/src/backend/config"
+	"github.com/yourname/cloudnative-go-journey/src/backend/handler"
+	"github.com/yourname/cloudnative-go-journey/src/backend/metrics"
+	"github.com/yourname/cloudnative-go-journey/src/backend/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -70,12 +70,19 @@ func main() {
 	router.GET("/health", handler.HealthCheck)
 	router.GET("/ready", handler.ReadinessCheck)
 
+	// v0.4 新增：前端服务
+	router.GET("/", handler.FrontendHandler)
+	router.GET("/frontend/health", handler.FrontendHealthCheck)
+
 	// 业务接口
 	api := router.Group("/api/v1")
 	{
 		// v0.1 接口
 		api.GET("/hello", handler.Hello)
 		api.GET("/info", handler.Info)
+
+		// v0.4 新增：版本接口（用于金丝雀发布验证）
+		api.GET("/version", handler.VersionHandler)
 	}
 
 	// v0.2 新增：缓存和数据接口

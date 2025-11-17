@@ -1,0 +1,76 @@
+# v0.4 前端服务 Deployment
+# 功能: 部署前端服务 Pod
+# 部署: kubectl apply -f k8s/v0.4/frontend/deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: default
+  labels:
+    app: frontend
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+        version: v1
+    spec:
+      containers:
+      - name: frontend
+        image: frontend:latest  # 使用 Nginx 前端镜像
+        imagePullPolicy: Never  # 本地开发使用 Never
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: PORT
+          value: "8080"
+        - name: ENVIRONMENT
+          value: "production"
+        
+        # 健康检查
+        livenessProbe:
+          httpGet:
+            path: /frontend/health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /frontend/health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+
+        # 资源限制
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+---
+# 说明:
+# 1. replicas: 1 - 前端服务只需 1 个副本
+# 2. image: api:latest - 使用相同的 Go 应用镜像
+# 3. imagePullPolicy: Never - 本地开发使用本地镜像
+# 4. livenessProbe: 存活探针，检查容器是否运行
+# 5. readinessProbe: 就绪探针，检查容器是否准备好接收流量
+# 6. resources: 资源限制，防止资源消耗过多
+
+# 部署前需要:
+# 1. 构建 Docker 镜像: docker build -t api:latest .
+# 2. 确保镜像在本地可用
