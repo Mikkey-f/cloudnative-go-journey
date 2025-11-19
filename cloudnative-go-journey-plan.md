@@ -2525,3 +2525,60 @@ CKAD 应用开发覆盖：     85%
 **文档版本**: v2.0.0
 
 **项目版本规划**: v0.1 → v0.2 → v0.3 → v0.4 → v0.5 → v0.6 → v0.7 → v1.0 → **v1.5（边缘）** → v2.x（可选扩展）
+
+```mermaid
+graph TD
+    %% ----------------用户交互层----------------
+    subgraph User_Layer [用户交互层 User Interaction Layer]
+        direction TB
+        U1(用户 User) -->|显式指令 / 隐式行为序列| UI[交互接口]
+    end
+
+    %% ----------------智能体核心层----------------
+    subgraph Agent_Core [智能体核心层 Agentic Core Logic]
+        direction TB
+        
+        %% 模块1: 感知与规划
+        Intent[意图识别模块] --> Planner[任务规划器 / Planner]
+        
+        %% 模块2: 检索协调
+        Planner -->|生成的检索计划| QR[查询重写与分发模块]
+        
+        %% 模块3: 推理与生成
+        Context_Fusion[上下文融合与推理引擎] -->|结构化Prompt| LLM_Brain((大语言模型 LLM))
+        LLM_Brain -->|生成候选与解释| Response_Gen[响应生成模块]
+        
+        %% 模块4: 反思与更新
+        Reflection[反思与记忆更新模块]
+    end
+
+    %% ----------------RAG 检索服务层----------------
+    subgraph RAG_Layer [RAG检索与多源知识层 RAG & Knowledge Layer]
+        direction TB
+        
+        %% 分支A: 历史记忆 (长期)
+        Vector_Search[向量检索接口] <-->|读/写| Vector_DB[(向量数据库 Milvus\n存储: 用户长短期记忆)]
+        
+        %% 分支B: 物品知识 (逻辑)
+        KG_Search[图谱推理接口] <-->|查询| KG_DB[(知识图谱 Neo4j\n存储: 物品属性/关联)]
+        
+        %% 分支C: 网络信息 (时效)
+        Web_Connector[网络搜索连接器] <-->|API调用| Internet((实时互联网\n来源: 新闻/趋势/评测))
+    end
+
+    %% ----------------跨层数据流向----------------
+    %% 修正点：节点连节点，不要连子图
+    UI -->|输入数据: 用户ID/历史序列/当前请求| Intent
+    
+    QR -->|Query A: 语义相似性| Vector_Search
+    QR -->|Query B: 多跳关系| KG_Search
+    QR -->|Query C: 关键词搜索| Web_Connector
+    
+    Vector_Search -->|召回: 相似偏好| Context_Fusion
+    KG_Search -->|召回: 互补/替代品| Context_Fusion
+    Web_Connector -->|召回: 热点/新片| Context_Fusion
+    
+    Response_Gen -->|推荐列表 + 解释| U1
+    U1 -->|反馈: 点击/跳过| Reflection
+    Reflection -.->|写入| Vector_DB
+ ```

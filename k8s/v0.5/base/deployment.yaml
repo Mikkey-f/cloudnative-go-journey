@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels:
+    app: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+      - name: api
+        image: api:v0.5.0
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8080
+          name: http
+        
+        # v0.5 新增：ConfigMap 挂载（不使用 subPath）
+        volumeMounts:
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        
+        # 环境变量注入（敏感信息）
+        env:
+        - name: REDIS_HOST
+          value: "redis-service"
+        - name: REDIS_PORT
+          value: "6379"
+        
+        # 健康检查
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        
+        # 资源限制
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      
+      # 挂载 ConfigMap
+      volumes:
+      - name: config
+        configMap:
+          name: api-config

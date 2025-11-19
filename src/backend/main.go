@@ -22,38 +22,51 @@ import (
 )
 
 func main() {
-	// 加载配置
-	cfg := config.Load()
-
-	// 初始化 Redis 客户端
-	redisAddr := os.Getenv("REDIS_HOST")
-	if redisAddr == "" {
-		redisAddr = "localhost" // 本地开发默认值
+	// v0.5 新配置系统：加载配置
+	configManager := config.NewManager()
+	if err := configManager.Load(); err != nil {
+		log.Fatalf("❌ 配置加载失败: %v", err)
 	}
-	redisPort := os.Getenv("REDIS_PORT")
-	if redisPort == "" {
-		redisPort = "6379"
-	}
-	redisFullAddr := fmt.Sprintf("%s:%s", redisAddr, redisPort)
+	
+	cfg := configManager.GetConfig()
+	log.Printf("✅ 配置加载成功 - 环境: %s, 版本: %s", cfg.Server.Environment, cfg.Server.Version)
 
-	log.Printf("🔗 Connecting to Redis at %s...", redisFullAddr)
-	redisCache, err := cache.NewRedisCache(redisFullAddr)
-	if err != nil {
-		log.Printf("⚠️  Warning: Redis connection failed: %v", err)
-		log.Printf("⚠️  Continuing without cache support...")
-		// 在生产环境可能需要 fatal，这里为了演示继续运行
+	// v0.5 新功能：启动配置热更新监听
+	if cfg.Features.EnableHotReload {
+		configManager.Watch()
+		
+		// 注册配置变更回调
+		configManager.OnChange(func(newCfg *config.AppConfig) {
+			log.Printf("🔄 配置已更新 - 环境: %s, 日志级别: %s", newCfg.Server.Environment, newCfg.Log.Level)
+		})
+	}
+
+	// 初始化 Redis 客户端（使用新配置系统）
+	var redisCache *cache.RedisCache
+	var err error
+	if cfg.Redis.Enabled {
+		redisFullAddr := fmt.Sprintf("%s:%d", cfg.Redis.Host, cfg.Redis.Port)
+		log.Printf("🔗 Connecting to Redis at %s...", redisFullAddr)
+		
+		redisCache, err = cache.NewRedisCache(redisFullAddr)
+		if err != nil {
+			log.Printf("⚠️  Warning: Redis connection failed: %v", err)
+			log.Printf("⚠️  Continuing without cache support...")
+		} else {
+			log.Printf("✅ Redis connected successfully")
+			defer func(redisCache *cache.RedisCache) {
+				err := redisCache.Close()
+				if err != nil {
+					log.Printf("⚠️  Warning: Redis connection close failed: %v", err)
+				}
+			}(redisCache)
+		}
 	} else {
-		log.Printf("✅ Redis connected successfully")
-		defer func(redisCache *cache.RedisCache) {
-			err := redisCache.Close()
-			if err != nil {
-				log.Fatalln("<UNK>  Warning: Redis connection close failed:", err)
-			}
-		}(redisCache)
+		log.Println("ℹ️  Redis disabled in configuration")
 	}
 
-	// 设置 Gin 模式，release模式精简日志
-	if cfg.Environment == "production" {
+	// 设置 Gin 模式
+	if cfg.Server.Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
@@ -83,6 +96,12 @@ func main() {
 
 		// v0.4 新增：版本接口（用于金丝雀发布验证）
 		api.GET("/version", handler.VersionHandler)
+		
+		// v0.5 新增：配置管理接口
+		if cfg.Features.EnableConfigAPI {
+			configHandler := handler.NewConfigHandler(configManager)
+			configHandler.RegisterRoutes(api)
+		}
 	}
 
 	// v0.2 新增：缓存和数据接口
@@ -91,7 +110,7 @@ func main() {
 		dataHandler := handler.NewDataHandler(redisCache)
 
 		api.GET("/cache/test", cacheHandler.TestCache)
-		api.GET("/config", cacheHandler.GetConfig)
+		// api.GET("/config", cacheHandler.GetConfig) // v0.5: 已被 ConfigHandler 替代
 		api.GET("/cache/stats", dataHandler.GetCacheStats)
 
 		api.POST("/data", dataHandler.CreateData)
@@ -114,17 +133,22 @@ func main() {
 	// 初始化 Prometheus 指标
 	metrics.Init()
 
-	// 创建 HTTP 服务器
+	// 创建 HTTP 服务器（使用新配置）
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", cfg.Port),
-		Handler: router,
+		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
+		Handler:      router,
+		ReadTimeout:  cfg.Server.ReadTimeout,
+		WriteTimeout: cfg.Server.WriteTimeout,
 	}
 
 	// 启动服务器（goroutine）
 	go func() {
-		log.Printf("🚀 Server starting on port %d...", cfg.Port)
-		log.Printf("📊 Metrics available at http://localhost:%d/metrics", cfg.Port)
-		log.Printf("❤️  Health check at http://localhost:%d/health", cfg.Port)
+		log.Printf("🚀 Server starting on %s:%d...", cfg.Server.Host, cfg.Server.Port)
+		log.Printf("📊 Metrics available at http://localhost:%d/metrics", cfg.Server.Port)
+		log.Printf("❤️  Health check at http://localhost:%d/health", cfg.Server.Port)
+		if cfg.Features.EnableConfigAPI {
+			log.Printf("⚙️  Config API available at http://localhost:%d/api/v1/config", cfg.Server.Port)
+		}
 
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("Failed to start server: %v", err)

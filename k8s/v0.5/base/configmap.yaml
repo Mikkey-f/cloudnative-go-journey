@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-config
+data:
+  config.yaml: |
+    server:
+      port: 8080
+      host: "0.0.0.0"
+      environment: "development"
+      app_name: "cloudnative-go-api"
+      version: "v0.5.0"
+      read_timeout: 30s
+      write_timeout: 30s
+
+    database:
+      enabled: false
+
+    redis:
+      enabled: true
+      host: "redis-service"
+      port: 6379
+      db: 0
+      max_retries: 3
+      pool_size: 10
+      pool_timeout: 5s
+
+    log:
+      level: "info"
+      format: "json"
+      output: "stdout"
+      enable_caller: true
+      enable_stacktrace: false
+
+    features:
+      enable_metrics: true
+      enable_health_check: true
+      enable_config_api: true
+      enable_hot_reload: true

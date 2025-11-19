@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+spec:
+  replicas: 1  # Dev 环境副本数
+  selector:
+    matchLabels:
+      env: dev  # 添加环境标签到选择器
+  template:
+    metadata:
+      labels:
+        env: dev  # 添加环境标签到 Pod
+    spec:
+      containers:
+      - name: api
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
